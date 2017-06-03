@@ -3,13 +3,16 @@ require 'http'
 require 'httparty'
 require 'gpgme'
 require 'json'
+require 'yaml'
 
 # wispr cli class
 class WisprCLI < Thor
   include GPGME
   include HTTParty
+  $settings_file = YAML::load_file "./settings/settings.yml"
+  $auth_file = YAML::load_file "./settings/token.yml"
   base_uri  'localhost:3000/api/v1/'
-
+########################################
   desc 'login', 'login to wispr'
   def login
     username = ask 'Enter your username:'
@@ -18,16 +21,25 @@ class WisprCLI < Thor
     say("logging in, please wait a moment!", :green)
     response = HTTP.post("#{self.class.base_uri}/accounts/authenticate",
                          json: { username: username, password: password })
-    #say("#{response}")
     token=response.parse
-    say("#{token["auth_token"]}")
-    # say("#{response.auth_token}")
-  end
 
+    $auth_file = token.to_yaml
+    File.write("./settings/token.yml",$auth_file)
+    say("#{token.to_yaml}")
+  end
+############################################
   desc 'messages', 'list messages'
   def messages
-  end
+    currentid = $auth_file["account"]["id"]
+    say("sending req to #{self.class.base_uri}/accounts/#{currentid}/messages")
 
+    response = HTTP.auth("Bearer #{$auth_file["auth_token"]}")
+                    .get("#{self.class.base_uri}/accounts/#{currentid}/messages")
+    say(response.status)
+    say(response)
+    #say($auth_file["auth_token"].to_json)
+  end
+#######################################
   desc 'getmessage', 'gets your message and tries to decrypts it'
   def getmessage
     # function to ask for keyfile password
@@ -38,19 +50,23 @@ class WisprCLI < Thor
     end
 
     encrypted_data = GPGME::Data.new(File.open("encrypted.txt.pgp"))
-    key = GPGME::Data.new(File.open("key.txt"))
+    key = GPGME::Data.new(File.open($settings_file["keyfile_location"]))
 
     ctx = GPGME::Ctx.new :passphrase_callback => method(:passfunc)
     ctx.import_keys key
 
     decrypted = ctx.decrypt encrypted_data
     decrypted.seek(0)
+    say(decrypted)
   end
-
-  desc 'pk', 'set path for your private key'
+###################################
+  desc 'setpk', 'set path for your private key'
   def pk
-    path = ask 'Enter path to your private key:'
-    say('thanks! path set, you will still need your password to access the key')
+    path = ask 'Enter your private key location:'
+    say(" PATH SET TO #{$settings_file["keyfile_location"]}")
+    say('You will still need your password to access the key')
+    $settings_file["keyfile_location"] = path
+    File.write("settings.yml",$settings_file.to_yaml)
   end
 end
 
