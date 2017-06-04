@@ -1,0 +1,2 @@
+this file should be your private key, failing that just tell the app where your key is and it will use it from there.
+setup key location "ruby wisper-cli.rb setpk"
