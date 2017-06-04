@@ -27,21 +27,39 @@ class WisprCLI < Thor
     File.write("./settings/token.yml",$auth_file)
     say("#{token.to_yaml}")
   end
+=begin
 ############################################
   desc 'messages', 'list messages'
   def messages
+    def extract_messages(messages)
+      messages['data'].map do |msg|
+        { id: msg['id'],
+          title: msg['attributes']['title'],
+          about: msg['attributes']['about'],
+          #status: msg['attributes']['status'],
+          expire_date: msg['attributes']['expire_date'],
+          body: msg['attributes']['body']}
+          #from_user: msg['relationships']['from']['username'],
+          #to_user: msg['relationships']['to']['username'] }
+      end
+    end
+
     currentid = $auth_file["account"]["id"]
     say("sending req to #{self.class.base_uri}/accounts/#{currentid}/messages")
 
     response = HTTP.auth("Bearer #{$auth_file["auth_token"]}")
                     .get("#{self.class.base_uri}/accounts/#{currentid}/messages")
-    say(response.status)
+    say(response.code)
     say(response)
+    response.code == 200 ? extract_messages(response.parse) : nil
+
     #say($auth_file["auth_token"].to_json)
+
   end
+=end
 #######################################
-  desc 'getmessage', 'gets your message and tries to decrypts it'
-  def getmessage
+  desc 'getmessage', 'gets message with id and decrypts it using keyfile'
+  def getmessage(messageid)
     # function to ask for keyfile password
     def passfunc(obj, uid_hint, passphrase_info, prev_was_bad, fd)
       io = IO.for_fd(fd, 'w')
@@ -49,7 +67,16 @@ class WisprCLI < Thor
       io.flush
     end
 
-    encrypted_data = GPGME::Data.new(File.open("encrypted.txt.pgp"))
+    currentid = $auth_file["account"]["id"]
+    #say("sending req to #{self.class.base_uri}/messages/#{messageid}")
+    response = HTTP.auth("Bearer #{$auth_file["auth_token"]}")
+                    .get("#{self.class.base_uri}/messages/#{messageid}")
+
+    body = response.parse["attributes"]["body"]
+
+    say(response.code)
+    #say(body)
+    encrypted_data = GPGME::Data.new(body)
     key = GPGME::Data.new(File.open($settings_file["keyfile_location"]))
 
     ctx = GPGME::Ctx.new :passphrase_callback => method(:passfunc)
