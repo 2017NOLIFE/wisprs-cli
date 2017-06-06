@@ -11,53 +11,23 @@ class WisprCLI < Thor
   include HTTParty
   $settings_file = YAML::load_file "./settings/settings.yml"
   $auth_file = YAML::load_file "./settings/token.yml"
-  base_uri  'localhost:3000/api/v1/'
+  base_uri  $settings_file["URI"]
 ########################################
   desc 'login', 'login to wispr'
   def login
     username = ask 'Enter your username:'
-    password = ask 'Enter your password:'
+    password = ask 'Enter your password:' , :echo => false
     # say("connecting to #{self.class.base_uri}/accounts/authenticate", :green)
     say("logging in, please wait a moment!", :green)
     response = HTTP.post("#{self.class.base_uri}/accounts/authenticate",
                          json: { username: username, password: password })
+    # say(response.status) need to add some validation here. if not 200 dies
     token=response.parse
 
     $auth_file = token.to_yaml
     File.write("./settings/token.yml",$auth_file)
-    say("#{token.to_yaml}")
   end
-=begin
-############################################
-  desc 'messages', 'list messages'
-  def messages
-    def extract_messages(messages)
-      messages['data'].map do |msg|
-        { id: msg['id'],
-          title: msg['attributes']['title'],
-          about: msg['attributes']['about'],
-          #status: msg['attributes']['status'],
-          expire_date: msg['attributes']['expire_date'],
-          body: msg['attributes']['body']}
-          #from_user: msg['relationships']['from']['username'],
-          #to_user: msg['relationships']['to']['username'] }
-      end
-    end
-
-    currentid = $auth_file["account"]["id"]
-    say("sending req to #{self.class.base_uri}/accounts/#{currentid}/messages")
-
-    response = HTTP.auth("Bearer #{$auth_file["auth_token"]}")
-                    .get("#{self.class.base_uri}/accounts/#{currentid}/messages")
-    say(response.code)
-    say(response)
-    response.code == 200 ? extract_messages(response.parse) : nil
-
-    #say($auth_file["auth_token"].to_json)
-
-  end
-=end
-#######################################
+  #####################################
   desc 'getmessage', 'gets message with id and decrypts it using keyfile'
   def getmessage(messageid)
     # function to ask for keyfile password
@@ -68,17 +38,15 @@ class WisprCLI < Thor
     end
 
     currentid = $auth_file["account"]["id"]
-    #say("sending req to #{self.class.base_uri}/messages/#{messageid}")
     response = HTTP.auth("Bearer #{$auth_file["auth_token"]}")
                     .get("#{self.class.base_uri}/messages/#{messageid}")
-
+    say(response)
     body = response.parse["attributes"]["body"]
 
-    say(response.code)
-    #say(body)
+    say(response.code, :yellow)
+
     encrypted_data = GPGME::Data.new(body)
     key = GPGME::Data.new(File.open($settings_file["keyfile_location"]))
-
     ctx = GPGME::Ctx.new :passphrase_callback => method(:passfunc)
     ctx.import_keys key
 
@@ -88,12 +56,21 @@ class WisprCLI < Thor
   end
 ###################################
   desc 'setpk', 'set path for your private key'
-  def pk
-    path = ask 'Enter your private key location:'
-    say(" PATH SET TO #{$settings_file["keyfile_location"]}")
-    say('You will still need your password to access the key')
+  def setpk
+    path = ask 'Enter your private key location:' , :path => true
+    say("PATH SET TO #{path}", :green)
+    say('You will still need your password to access the key', :red)
     $settings_file["keyfile_location"] = path
-    File.write("settings.yml",$settings_file.to_yaml)
+    File.write("./settings/settings.yml",$settings_file.to_yaml)
+  end
+######################################
+  desc 'setserv', 'url to connect to'
+  def setserv
+    url = ask 'Enter URL of wispr server, do not input /api/v1/.. unless you
+     know what you are doing, it is appended automaticaly:', :path => true
+    say("URL SET TO #{url}", :green)
+    $settings_file["URI"] = "#{url}/api/v1/"
+    File.write("./settings/settings.yml",$settings_file.to_yaml)
   end
 end
 
