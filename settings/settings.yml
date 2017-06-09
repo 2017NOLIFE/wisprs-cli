@@ -1,3 +1,4 @@
 ---
 keyfile_location: "./lib/key.txt"
-URI: localhost:3000/api/v1/
+SIGNING_KEY: "tTgOBjneUOYuLJyxxyhZRAkBZJX4jovLmRraWvaAdWY="
+URI: "https://wisprs.herokuapp.com/api/v1/"

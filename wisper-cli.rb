@@ -4,6 +4,8 @@ require 'httparty'
 require 'gpgme'
 require 'json'
 require 'yaml'
+require 'base64'
+require 'rbnacl/libsodium'
 
 # wispr cli class
 class WisprCLI < Thor
@@ -15,13 +17,21 @@ class WisprCLI < Thor
 ########################################
   desc 'login', 'login to wispr'
   def login
+    def sign(message)
+      skey = Base64.strict_decode64($settings_file["SIGNING_KEY"])
+      signing_key = RbNaCl::SigningKey.new(skey)
+      signature_raw = signing_key.sign(message.to_json)
+      Base64.strict_encode64(signature_raw)
+    end
     username = ask 'Enter your username:'
     password = ask 'Enter your password:' , :echo => false
     # say("connecting to #{self.class.base_uri}/accounts/authenticate", :green)
     say("logging in, please wait a moment!", :green)
+    message = { username: username, password: password }
     response = HTTP.post("#{self.class.base_uri}/accounts/authenticate",
-                         json: { username: username, password: password })
-    # say(response.status) need to add some validation here. if not 200 dies
+                         json: {data: message,
+                         signiture: sign(message)})
+    say(response.status)# need to add some validation here. if not 200 dies
     token=response.parse
 
     $auth_file = token.to_yaml
