@@ -29,13 +29,13 @@ class WisprCLI < Thor
     say("logging in, please wait a moment!", :green)
     message = { username: username, password: password }
     response = HTTP.post("#{self.class.base_uri}/accounts/authenticate",
-                         json: {data: message,
-                         signiture: sign(message)})
-    say(response.status)# need to add some validation here. if not 200 dies
-    token=response.parse
+                         json: { data: message,
+                                 signature: sign(message)})
+    say(response.status) # need to add some validation here. if not 200 dies
+    token = response.parse
 
     $auth_file = token.to_yaml
-    File.write("./settings/token.yml",$auth_file)
+    File.write("./settings/token.yml", $auth_file)
   end
   #####################################
   desc 'getmessage', 'gets message with id and decrypts it using keyfile'
@@ -49,7 +49,7 @@ class WisprCLI < Thor
 
     currentid = $auth_file["account"]["id"]
     response = HTTP.auth("Bearer #{$auth_file["auth_token"]}")
-                    .get("#{self.class.base_uri}/messages/#{messageid}")
+                   .get("#{self.class.base_uri}/messages/#{messageid}")
     say(response)
     body = response.parse["attributes"]["body"]
 
